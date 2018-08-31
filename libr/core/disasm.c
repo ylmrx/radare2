@@ -4147,6 +4147,8 @@ static void mipsTweak(RDisasmState *ds) {
 	//}
 }
 
+static ut64 skipEsil = UT64_MAX;
+
 // modifies anal register state
 static void ds_print_esil_anal(RDisasmState *ds) {
 	RCore *core = ds->core;
@@ -4161,6 +4163,10 @@ static void ds_print_esil_anal(RDisasmState *ds) {
 	r_anal_op_hint (&ds->analop, hint);
 	r_anal_hint_free (hint);
 	if (!hc) {
+		return;
+	}
+	if (skipEsil != UT64_MAX && skipEsil == at) {
+		skipEsil = UT64_MAX;
 		return;
 	}
 	if (!esil) {
@@ -4193,6 +4199,33 @@ static void ds_print_esil_anal(RDisasmState *ds) {
 	}
 	ds->esil_likely = 0;
 	mipsTweak (ds);
+	// HACK to support CALL $j+POP without using the stack. only for linear cases
+	if (ds->analop.type == R_ANAL_OP_TYPE_CALL) {
+		ut64 jump = ds->analop.jump;
+		if (jump == at + ds->analop.size) {
+			RAnalOp* op = r_core_anal_op (ds->core, jump, R_ANAL_OP_MASK_ESIL);
+			if (op) {
+				if (op->type == R_ANAL_OP_TYPE_POP) {
+					char *opEsil = strdup (r_strbuf_get (&op->esil));
+					char *tok = strstr (opEsil, ",=,");
+					if (tok) { // ",esi,=,"
+						*tok = 0;
+						char *comma = strrchr (opEsil, ',');
+						if (comma) {
+							char *callPopEsil = r_str_newf ("0x%"PFMT64x",%s,=", jump, comma + 1);
+							r_anal_esil_parse (esil, callPopEsil);
+							r_anal_esil_stack_free (esil);
+							free (callPopEsil);
+							skipEsil = jump;
+						}
+					}
+					free (opEsil);
+				}
+				r_anal_op_free (op);
+			}
+		}
+		goto beach;
+	}
 	r_anal_esil_set_pc (esil, at);
 	r_anal_esil_parse (esil, R_STRBUF_SAFEGET (&ds->analop.esil));
 	r_anal_esil_stack_free (esil);

@@ -2665,6 +2665,7 @@ R_API char *r_core_op_str(RCore *core, ut64 addr) {
 	return str;
 }
 
+// dupe of r_core_anal_op()
 R_API RAnalOp *r_core_op_anal(RCore *core, ut64 addr) {
 	ut8 buf[64];
 	RAnalOp *op = R_NEW (RAnalOp);

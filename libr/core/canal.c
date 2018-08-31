@@ -849,6 +849,7 @@ R_API RAnalOp* r_core_anal_op(RCore *core, ut64 addr, int mask) {
 	}
 
 	// decode instruction here
+	// XXX this shouldnt be happening, this is slow. ranalop should be merged with rasm
 	r_asm_set_pc (core->assembler, addr);
 	r_asm_op_init (&asmop);
 	if (r_asm_disassemble (core->assembler, &asmop, ptr, len) > 0) {
